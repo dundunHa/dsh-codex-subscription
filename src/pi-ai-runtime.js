@@ -133,8 +133,9 @@ export function openaiCodexSubscriptionProvider({
         : requestedVerbosity
       : undefined
     // A tier is sent only when the account catalog advertises it for this model;
-    // otherwise the request stays on the standard tier.
-    const speedMode = resolveSpeedMode()
+    // otherwise the request stays on the standard tier. The resolver sees the
+    // request's options (sessionId) so a per-session override can win.
+    const speedMode = resolveSpeedMode(options)
     const serviceTier = speedMode === SPEED_MODE_ULTRAFAST && metadata?.supportsUltrafast === true
       ? ULTRAFAST_SERVICE_TIER
       : speedMode === SPEED_MODE_FAST && (metadata?.supportsFast ?? supportsCodexFastMode(model?.id))

@@ -8,6 +8,7 @@ import { PREFERENCE_FIELDS, normalizeReasoningCache } from './preference-fields.
 import { createSubscriptionConnection } from './subscription-connection.js'
 import { createCompactionBridge } from './subscription-compaction.js'
 import { createReasoningBridge } from './subscription-reasoning.js'
+import { createSessionSpeedRegistry, installSessionSpeedRegistry } from './session-speed.js'
 import { registerSubscriptionTransport } from './subscription-transport.js'
 import { createSubagentBackendSwitcher, createSubscriptionSubagent, loadSubagentRuntime, presetEntries } from './subagent-backend.js'
 import { inspectSubagentRuntime } from './subagent-runtime.js'
@@ -222,12 +223,16 @@ export function apply(ctx, config = {}) {
   ctx.on('session/disposed', session => reasoning.sessionDisposed(session))
   ctx.on('session/event', (session, event) => reasoning.sessionEvent(session, event))
   ctx.effect(() => () => connection.dispose())
+  // Other plugins may pin a speed mode on one session (e.g. a delegated subagent).
+  const sessionSpeed = createSessionSpeedRegistry()
+  ctx.effect(() => installSessionSpeedRegistry(sessionSpeed))
+  ctx.on('session/disposed', session => sessionSpeed.clear(session?.id))
   const provider = openaiCodexSubscriptionProvider({
     ultra,
     connection,
     compaction,
     reasoning,
-    resolveSpeedMode: () => settings.get()[SPEED_MODE_FIELD],
+    resolveSpeedMode: options => sessionSpeed.get(options?.sessionId) ?? settings.get()[SPEED_MODE_FIELD],
     resolveOutputVerbosity: () => normalizeOutputVerbosity(settings.get()[OUTPUT_VERBOSITY_FIELD]),
     resolveInputImageDetail: () => settings.get()[INPUT_IMAGE_DETAIL_FIELD],
     resolveReasoningSummary: () => settings.get()[REASONING_SUMMARY_FIELD],
